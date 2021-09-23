@@ -22,7 +22,7 @@ export class Player {
 	 * Value to sort players.
 	 * @type {?Number}
 	 */
-	private seed: number | null;
+	readonly seed: number | null;
 
 	/**
 	 * Number of match points the player has.
@@ -52,7 +52,7 @@ export class Player {
 	 * Number of initial byes assigned.
 	 * @type {Number}
 	 */
-	private initialByes: number;
+	readonly initialByes: number;
 
 	/**
 	 * Number of byes assigned.
@@ -71,25 +71,25 @@ export class Player {
 	 * Add 1 for white (player one) and subtract 1 for black (player two).
 	 * @type {Number}
 	 */
-	private colorPref: number;
+	public colorPref: number;
 
 	/**
 	 * Array of colors that player has played in a chess tournament.
 	 * @type {String[]}
 	 */
-	private colors: string[];
+	public colors: string[];
 
 	/**
 	 * If the player is still in the tournament.
 	 * @type {Boolean}
 	 */
-	private active: boolean;
+	public active: boolean;
 
 	/**
 	 * Tiebreaker values.
 	 * @type {Object}
 	 */
-	private tiebreakers: {
+	readonly tiebreakers: {
 		matchWinPctM: number;
 		matchWinPctP: number;
 		oppMatchWinPctM: number;
@@ -118,7 +118,7 @@ export class Player {
 	 * @param {String} id String to be the player ID.
 	 * @param {?Number} seed Number to be used as the seed.
 	 */
-	constructor(alias: string | Player, id: string, seed: number | null) {
+	constructor(alias: string | Player, id?: string, seed?: number | null) {
 		if (arguments.length === 1) {
 			const oldPlayer: Player = arguments[0];
 			// manually set defaults to satisfy ts
@@ -142,7 +142,7 @@ export class Player {
 			this.etc = oldPlayer.etc;
 		} else {
 			this.alias = alias.toString();
-			this.id = id.toString();
+			this.id = id!.toString();
 			this.seed = typeof seed === "number" ? seed : null;
 			this.matchPoints = 0;
 			this.matches = 0;

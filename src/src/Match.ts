@@ -6,69 +6,69 @@ export class Match {
 	 * Unique ID for the match.
 	 * @type {String}
 	 */
-	private id: string;
+	readonly id: string;
 	/**
 	 * Round number for the match.
 	 * @type {Number}
 	 */
-	private round: number;
+	readonly round: number;
 	/**
 	 * Match number.
 	 * @type {Number}
 	 */
-	private matchNumber: number;
+	readonly matchNumber: number;
 	/**
 	 * Player number one in the match.
 	 * If null, the player has not been determined.
 	 * @type {?Player}
 	 * @default null
 	 */
-	private playerOne: Player | null;
+	public playerOne: Player | null;
 	/**
 	 * Player number two in the match.
 	 * If null, the player has not been determined.
 	 * @type {?Player}
 	 * @default null
 	 */
-	private playerTwo: Player | null;
+	public playerTwo: Player | null;
 	/**
 	 * The status of the match.
 	 * @type {Boolean}
 	 * @default false
 	 */
-	private active: boolean;
+	public active: boolean;
 	/**
 	 * Number of wins for player one.
 	 * @type {Number}
 	 * @default 0
 	 */
-	private playerOneWins: number;
+	public playerOneWins: number;
 	/**
 	 * Number of wins for player two.
 	 * @type {Number}
 	 * @default 0
 	 */
-	private playerTwoWins: number;
+	public playerTwoWins: number;
 	/**
 	 * Number of draws.
 	 * @type {Number}
 	 * @default 0
 	 */
-	private draws: number;
+	public draws: number;
 	/**
 	 * Next match for the winner.
 	 * Used in elimination formats.
 	 * @type {?Match}
 	 * @default null
 	 */
-	private winnerPath: Match | null;
+	public winnerPath: Match | null;
 	/**
 	 * Next match for the loser.
 	 * Used in elimination formats.
 	 * @type {?Match}
 	 * @default null
 	 */
-	private loserPath: Match | null;
+	public loserPath: Match | null;
 
 	/**
 	 * Create a new match.
@@ -77,7 +77,7 @@ export class Match {
 	 * @param {Number} matchNumber The match number.
 	 * @param {?Player[]} players Array of players for the match.
 	 */
-	constructor(id: string | Match, round: number, matchNumber: number, players: Player[] | null = null) {
+	constructor(id: string | Match, round?: number, matchNumber?: number, players: Array<Player | null> | null = null) {
 		if (arguments.length === 1) {
 			// manual assign for ts
 			const oldMatch: Match = arguments[0];
@@ -94,8 +94,8 @@ export class Match {
 			this.loserPath = oldMatch.loserPath;
 		} else {
 			this.id = id.toString();
-			this.round = round;
-			this.matchNumber = matchNumber;
+			this.round = round!;
+			this.matchNumber = matchNumber!;
 
 			this.playerOne = null;
 

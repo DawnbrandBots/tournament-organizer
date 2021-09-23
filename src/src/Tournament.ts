@@ -1,143 +1,256 @@
-"use strict";
+import { Match } from "./Match";
+import { Player } from "./Player";
+import * as Utilities from "../lib/Utilities";
+import * as Algorithms from "../lib/Algorithms";
+import * as Tiebreakers from "../lib/Tiebreakers";
 
-const Match = require("./Match");
-const Player = require("./Player");
-const Utilities = require("../lib/Utilities");
-const Algorithms = require("../lib/Algorithms");
-const Tiebreakers = require("../lib/Tiebreakers");
+export interface Options {
+	name?: string;
+	seededPlayers?: string;
+	seedOrder?: "asc" | "des";
+	format?: "elim" | "robin" | "swiss";
+	playoffs?: "elim" | "2xelim";
+	thirdPlaceMatch?: boolean;
+	maxPlayers?: number;
+	winValue?: number;
+	drawValue?: number;
+	lossValue?: number;
+	numberOfRounds?: number;
+	bestOf?: number;
+	cutType?: "rank" | "points";
+	cutLimit?: number;
+	tiebreakers?: TiebreakerOption[];
+	dutch?: boolean;
+	groupNumber?: number;
+	cutEachGroup?: boolean;
+	doubleRR?: boolean;
+	doubleElim?: boolean;
+}
+
+const tiebreakerOptions = [
+	"buchholz-cut1",
+	"solkoff",
+	"median-buchholz",
+	"sonneborn-berger",
+	"cumulative",
+	"versus",
+	"magic-tcg",
+	"pokemon-tcg",
+	"match-points"
+] as const;
+
+type TiebreakerOption = typeof tiebreakerOptions[number];
 
 /** Class representing a tournament. */
-class Tournament {
+export abstract class Tournament {
+	/**
+	 * Alphanumeric string ID.
+	 * @type {String}
+	 */
+	private eventID: string;
+
+	/**
+	 * Name of the tournament.
+	 * @type {?String}
+	 * @default null
+	 */
+	private name: string | null;
+
+	/**
+	 * Whether or not to organize players by seed when pairing.
+	 * @type {Boolean}
+	 * @default false
+	 */
+	readonly seededPlayers: boolean;
+
+	/**
+	 * If the seeding should be sorted in ascending or descending order.
+	 * @type {('asc'|'des')}
+	 * @default 'asc'
+	 */
+	readonly seedOrder: "asc" | "des";
+
+	/**
+	 * Format for the first stage of the tournament.
+	 * @type {('elim'|'robin'|'swiss')}
+	 * @default 'elim'
+	 */
+	private format: "elim" | "robin" | "swiss";
+
+	/**
+	 * If there is a third place consolation match.
+	 * Only used if single elimination is the format (or playoffs format).
+	 * @type {Boolean}
+	 * @default false
+	 */
+	readonly thirdPlaceMatch: boolean;
+
+	/**
+	 * Maximum number of players allowed to register for the tournament (minimum 4).
+	 * If null, there is no maximum.
+	 * @type {?Number}
+	 * @default null
+	 */
+	private maxPlayers: number | null;
+
+	/**
+	 * The value of a win.
+	 * Must be a positive integer.
+	 * @type {Number}
+	 * @default 1
+	 */
+	readonly winValue: number;
+
+	/**
+	 * The value of a draw/tie.
+	 * Must be 0 or greater.
+	 * @type {Number}
+	 * @default 0.5
+	 */
+	readonly drawValue: number;
+
+	/**
+	 * The value of a loss.
+	 * Must be an integer.
+	 * @type {Number}
+	 * @default 0
+	 */
+	readonly lossValue: number;
+
+	/**
+	 * Creation date and time of the tournament.
+	 * @type {Date}
+	 */
+	private startTime: Date;
+
+	/**
+	 * Array of all players in the tournament.
+	 * @type {Player[]}
+	 * @default []
+	 */
+	public players: Player[];
+
+	/**
+	 * Array of all matches in the tournament.
+	 * @type {Match[]}
+	 * @default []
+	 */
+	public matches: Match[];
+
+	/**
+	 * If the tournament is active.
+	 * @type {Boolean}
+	 * @default false
+	 */
+	public active: boolean;
+
+	/**
+	 * An object to store any additional information.
+	 * @type {Object}
+	 * @default {}
+	 */
+	private etc: { [key: string]: string };
+
+	/**
+	 * Number of rounds for the first phase of the tournament.
+	 * If null, the value is determined by the number of players and the format.
+	 * @type {?Number}
+	 * @default null
+	 */
+	abstract numberOfRounds: number | null;
+
+	/**
+	 * Format for the second stage of the tournament.
+	 * If null, there is only one stage.
+	 * @type {?('elim'|'2xelim')}
+	 * @default null
+	 */
+	abstract playoffs: "elim" | "2xelim" | null;
+
+	/**
+	 * Number of possible games for a match, where the winner must win the majority of games up to 1 + x/2 (used for byes).
+	 * @type {Number}
+	 * @default 1
+	 */
+	abstract bestOf: number;
+
+	/**
+	 * Method to determine which players advance to the second stage of the tournament.
+	 * @type {('rank'|'points')}
+	 * @default 'rank'
+	 */
+	abstract cutType: "rank" | "points";
+
+	/**
+	 * Breakpoint for determining how many players advance to the second stage of the tournament.
+	 * If 0, it will override the playoff format to null.
+	 * If -1, all players will advance.
+	 * @type {Number}
+	 * @default 0
+	 */
+	abstract cutLimit: number;
+
+	/**
+	 * Array of tiebreakers to use, in order of precedence.
+	 * Options include: buchholz-cut1, solkoff, median-buchholz, sonneborn-berger, cumulative, versus, magic-tcg, pokemon-tcg.
+	 * Defaults for Swiss and Dutch are solkoff and cumulative.
+	 * @type {String[]}
+	 * @default null
+	 */
+	abstract tiebreakers: TiebreakerOption[] | null;
+
+	/**
+	 * If the Dutch variant of Swiss pairings should be used.
+	 * @type {Boolean}
+	 * @default false
+	 */
+	abstract dutch: boolean;
+
+	/**
+	 * Current round number.
+	 * 0 if the tournament has not started, -1 if the tournament is finished.
+	 * @type {Number}
+	 * @default 0
+	 */
+	abstract currentRound: number;
+
+	/**
+	 * If the event is ready to proceed to the next round.
+	 * @type {Boolean}
+	 * @default false
+	 */
+	abstract nextRoundReady: boolean;
+
+	/**
+	 * If the format is double elimination.
+	 * @type {Boolean}
+	 * @default false
+	 */
+	abstract doubleElim: boolean;
+
 	/**
 	 * Create a new tournament.
 	 * @param {String} id String to be the event ID.
 	 * @param {Object} options Options that can be defined for a tournament.
 	 */
-	constructor(id, options) {
-		/**
-		 * Alphanumeric string ID.
-		 * @type {String}
-		 */
+	constructor(id: string, options: Options) {
 		this.eventID = id;
-
-		/**
-		 * Name of the tournament.
-		 * @type {?String}
-		 * @default null
-		 */
-		this.name = options.hasOwnProperty("name") && typeof options.name === "string" ? options.name : null;
-
-		/**
-		 * Whether or not to organize players by seed when pairing.
-		 * @type {Boolean}
-		 * @default false
-		 */
-		this.seededPlayers =
-			options.hasOwnProperty("seededPlayers") && typeof options.seededPlayers === "boolean"
-				? options.seededPlayers
-				: false;
-
-		/**
-		 * If the seeding should be sorted in ascending or descending order.
-		 * @type {('asc'|'des')}
-		 * @default 'asc'
-		 */
+		this.name = options.name || null;
+		this.seededPlayers = !!options.seededPlayers;
 		this.seedOrder = options.hasOwnProperty("seedOrder") && options.seedOrder === "des" ? "des" : "asc";
-
-		/**
-		 * Format for the first stage of the tournament.
-		 * @type {('elim'|'robin'|'swiss')}
-		 * @default 'elim'
-		 */
-		this.format =
-			options.hasOwnProperty("format") && ["elim", "robin", "swiss"].includes(options.format) ? options.format : "elim";
-
-		/**
-		 * If there is a third place consolation match.
-		 * Only used if single elimination is the format (or playoffs format).
-		 * @type {Boolean}
-		 * @default false
-		 */
-		this.thirdPlaceMatch =
-			(options.format === "elim" || options.playoffs === "elim") &&
-			options.hasOwnProperty("thirdPlaceMatch") &&
-			options.thirdPlaceMatch
-				? true
-				: false;
-
-		/**
-		 * Maximum number of players allowed to register for the tournament (minimum 4).
-		 * If null, there is no maximum.
-		 * @type {?Number}
-		 * @default null
-		 */
+		this.format = options.format || "elim";
+		this.thirdPlaceMatch = (options.format === "elim" || options.playoffs === "elim") && !!options.thirdPlaceMatch;
 		this.maxPlayers =
-			options.hasOwnProperty("maxPlayers") && Number.isInteger(options.maxPlayers) && options.maxPlayers >= 4
-				? options.maxPlayers
-				: null;
-
-		/**
-		 * The value of a win.
-		 * Must be a positive integer.
-		 * @type {Number}
-		 * @default 1
-		 */
+			options.maxPlayers && Number.isInteger(options.maxPlayers) && options.maxPlayers >= 4 ? options.maxPlayers : null;
 		this.winValue =
-			options.hasOwnProperty("winValue") && Number.isInteger(options.winValue) && options.winValue > 0
-				? options.winValue
-				: 1;
-
-		/**
-		 * The value of a draw/tie.
-		 * Must be 0 or greater.
-		 * @type {Number}
-		 * @default 0.5
-		 */
+			options.winValue && Number.isInteger(options.winValue) && options.winValue > 0 ? options.winValue : 1;
 		this.drawValue =
-			options.hasOwnProperty("drawValue") && typeof options.drawValue === "number" && options.drawValue >= 0
-				? options.drawValue
-				: 0.5;
-
-		/**
-		 * The value of a loss.
-		 * Must be an integer.
-		 * @type {Number}
-		 * @default 0
-		 */
-		this.lossValue = options.hasOwnProperty("lossValue") && Number.isInteger(options.lossValue) ? options.lossValue : 0;
-
-		/**
-		 * Creation date and time of the tournament.
-		 * @type {Date}
-		 */
+			options.drawValue && typeof options.drawValue === "number" && options.drawValue >= 0 ? options.drawValue : 0.5;
+		this.lossValue = options.lossValue && Number.isInteger(options.lossValue) ? options.lossValue : 0;
 		this.startTime = new Date(Date.now());
-
-		/**
-		 * Array of all players in the tournament.
-		 * @type {Player[]}
-		 * @default []
-		 */
 		this.players = [];
-
-		/**
-		 * Array of all matches in the tournament.
-		 * @type {Match[]}
-		 * @default []
-		 */
 		this.matches = [];
-
-		/**
-		 * If the tournament is active.
-		 * @type {Boolean}
-		 * @default false
-		 */
 		this.active = false;
-
-		/**
-		 * An object to store any additional information.
-		 * @type {Object}
-		 * @default {}
-		 */
 		this.etc = {};
 	}
 
@@ -148,10 +261,10 @@ class Tournament {
 	 * @param {Number} seed The seed value of the player. Mandatory if seededPlayers is true.
 	 * @returns {Boolean} If the player was created and added.
 	 */
-	addPlayer(alias, id = null, seed = null) {
+	addPlayer(alias: string, id: string | null = null, seed: number | null = null): boolean {
 		if (this.players.length === this.maxPlayers || this.active || typeof alias !== "string" || alias.length === 0)
 			return false;
-		let playerID;
+		let playerID: string;
 		if (id === null) {
 			do {
 				playerID = Utilities.randomString(8);
@@ -172,7 +285,7 @@ class Tournament {
 	 * @param {Player} player The player to be removed.
 	 * @returns {?Match[]|Boolean} True, null, or array of new matches if player is removed, else false.
 	 */
-	removePlayer(player) {
+	removePlayer(player: Player): (Match[] | boolean) | null {
 		if (player.id === undefined) return false;
 		const playerIndex = this.players.findIndex(p => p.id === player.id);
 		if (playerIndex > -1) {
@@ -183,44 +296,44 @@ class Tournament {
 				if (!player.active) return false;
 				player.active = false;
 				let newMatches = null;
-				if (this.format.includes("elim") || this.currentRound > this.numberOfRounds) {
-					const m = this.activeMatches().find(x => x.playerOne.id === player.id || x.playerTwo.id === player.id);
+				if (this.format.includes("elim") || this.currentRound > this.numberOfRounds!) {
+					const m = this.activeMatches().find(x => x.playerOne!.id === player.id || x.playerTwo!.id === player.id);
 					if (m !== undefined) {
 						if (this.doubleElim) {
 							newMatches =
-								m.playerOne.id === player.id
-									? this.result(m, 0, Math.ceil(this.bestOf / 2), 0, false)
-									: this.result(m, Math.ceil(this.bestOf / 2), 0, 0, false);
-							m.loserPath.playerTwo = undefined;
-							if (m.loserPath.playerOne !== null)
-								newMatches = newMatches.concat(this.result(m.loserPath, Math.ceil(this.bestOf / 2), 0));
+								m.playerOne!.id === player.id
+									? this.result(m, 0, Math.ceil(this.bestOf / 2), 0, false)!
+									: this.result(m, Math.ceil(this.bestOf / 2), 0, 0, false)!;
+							m.loserPath!.playerTwo = null;
+							if (m.loserPath!.playerOne !== null)
+								newMatches = newMatches.concat(this.result(m.loserPath!, Math.ceil(this.bestOf / 2), 0)!);
 						} else
 							newMatches =
-								m.playerOne.id === player.id
+								m.playerOne!.id === player.id
 									? this.result(m, 0, Math.ceil(this.bestOf / 2))
 									: this.result(m, Math.ceil(this.bestOf / 2), 0);
 					}
 				} else if (this.format === "robin") {
 					const now = this.activeMatches(this.currentRound).find(
-						x => x.playerOne.id === player.id || x.playerTwo.id === player.id
+						x => x.playerOne!.id === player.id || x.playerTwo!.id === player.id
 					);
 					if (now !== undefined && now.active)
 						newMatches =
-							now.playerOne.id === player.id
+							now.playerOne!.id === player.id
 								? this.result(now, 0, Math.ceil(this.bestOf / 2))
 								: this.result(now, Math.ceil(this.bestOf / 2), 0);
 					for (let i = this.currentRound + 1; i < this.matches.reduce((x, y) => Math.max(x, y.round), 0); i++) {
 						const curr = this.matches
 							.filter(r => r.round === i)
-							.find(x => x.playerOne.id === player.id || x.playerTwo.id === player.id);
-						if (curr.playerOne.id === player.id) curr.playerOne = null;
+							.find(x => x.playerOne!.id === player.id || x.playerTwo!.id === player.id)!;
+						if (curr.playerOne!.id === player.id) curr.playerOne = null;
 						else curr.playerTwo = null;
 					}
 				} else if (this.format === "swiss") {
-					const m = this.activeMatches().find(x => x.playerOne.id === player.id || x.playerTwo.id === player.id);
+					const m = this.activeMatches().find(x => x.playerOne!.id === player.id || x.playerTwo!.id === player.id);
 					if (m !== undefined && m.active)
 						newMatches =
-							m.playerOne.id === player.id
+							m.playerOne!.id === player.id
 								? this.result(m, 0, Math.ceil(this.bestOf / 2))
 								: this.result(m, Math.ceil(this.bestOf / 2), 0);
 				}
@@ -234,7 +347,7 @@ class Tournament {
 	 * If the player was dropped as a result (elimination format), they are made active again.
 	 * @param {Match} match Match to have results undone.
 	 */
-	undoResults(match) {
+	undoResults(match: Match) {
 		if (match.playerOne === null || match.playerTwo === null || match.active) return;
 		match.resetResults(this.winValue, this.lossValue, this.drawValue);
 		match.playerOneWins = 0;
@@ -251,7 +364,7 @@ class Tournament {
 	 * @param {?Number} round Optional round selector.
 	 * @return {Match[]}
 	 */
-	activeMatches(round = null) {
+	activeMatches(round: number | null = null): Match[] {
 		return round === null
 			? this.matches.filter(m => m.active)
 			: this.matches.filter(r => r.round === round).filter(m => m.active);
@@ -262,133 +375,92 @@ class Tournament {
 	 * @param {Boolean} [active=true] Filtering only active players.
 	 * @return {Player[]}
 	 */
-	standings(active = true) {
+	standings(active: boolean = true): Player[] {
 		this.players.forEach(p => Tiebreakers.compute(p, this));
 		let thesePlayers = active ? this.players.filter(p => p.active) : [...this.players];
 		thesePlayers.sort((a, b) => {
-			for (let i = 0; i < this.tiebreakers.length; i++) {
-				const prop = this.tiebreakers[i].replace("-", "");
-				const eqCheck = Tiebreakers[prop].equal(a, b);
+			for (let i = 0; i < this.tiebreakers!.length; i++) {
+				const prop = this.tiebreakers![i].replace("-", "");
+				const eqCheck = Tiebreakers.default[prop].equal(a, b);
 				if (eqCheck === true) {
-					if (i === this.tiebreakers.length - 1) return Math.random() * 2 - 1;
+					if (i === this.tiebreakers!.length - 1) return Math.random() * 2 - 1;
 					else continue;
-				} else if (typeof eqCheck === "number") return Tiebreakers[prop].diff(a, b, eqCheck);
-				else return Tiebreakers[prop].diff(a, b);
+				} else if (typeof eqCheck === "number") return Tiebreakers.default[prop].diff(a, b, eqCheck);
+				else return Tiebreakers.default[prop].diff(a, b);
 			}
+			return 0; //should not occur, to satisfy typescript
 		});
 		return thesePlayers;
 	}
+
+	/**
+	 * Storing results of a match.
+	 * @param {Match} match The match being reported.
+	 * @param {Number} playerOneWins Number of wins for player one.
+	 * @param {Number} playerTwoWins Number of wins for player two.
+	 * @param {Number} [draws=0] Number of draws.
+	 * @param {Boolean} [dropdown=true] Whether or not to drop the player into loser's bracket in double elimination.
+	 * @returns {?Match[]} Array of new matches, or null if result failed.
+	 */
+	abstract result(
+		match: Match,
+		playerOneWins: number,
+		playerTwoWins: number,
+		draws?: number,
+		dropdown?: boolean
+	): Match[] | null;
 }
 
 /**
  * Class representing a Swiss pairing tournament.
  * @extends Tournament
  */
-class Swiss extends Tournament {
+export class Swiss extends Tournament {
+	numberOfRounds: number | null;
+	playoffs: "elim" | "2xelim" | null;
+	bestOf: number;
+	cutType: "points" | "rank";
+	tiebreakers: TiebreakerOption[] | null;
+	// dummy abstract properties
+	currentRound = -1;
+	cutLimit = -1;
+	doubleElim = false;
+	dutch = false;
+	nextRoundReady = false;
+
 	/**
 	 * Create a new Swiss pairing tournament.
 	 * @param {String} id String to be the event ID.
 	 * @param {Object} [options={}] Options that can be defined for a tournament.
 	 */
-	constructor(id, options = {}) {
+	constructor(id: string, options: Options = {}) {
 		super(id, options);
 
-		/**
-		 * Number of rounds for the first phase of the tournament.
-		 * If null, the value is determined by the number of players and the format.
-		 * @type {?Number}
-		 * @default null
-		 */
 		this.numberOfRounds =
-			options.hasOwnProperty("numberOfRounds") && Number.isInteger(options.numberOfRounds) && options.numberOfRounds > 0
+			options.numberOfRounds && Number.isInteger(options.numberOfRounds) && options.numberOfRounds > 0
 				? options.numberOfRounds
 				: null;
 
-		/**
-		 * Format for the second stage of the tournament.
-		 * If null, there is only one stage.
-		 * @type {?('elim'|'2xelim')}
-		 * @default null
-		 */
-		this.playoffs =
-			options.hasOwnProperty("playoffs") && ["elim", "2xelim"].includes(options.playoffs) ? options.playoffs : null;
+		this.playoffs = options.playoffs && ["elim", "2xelim"].includes(options.playoffs) ? options.playoffs : null;
 
-		/**
-		 * Number of possible games for a match, where the winner must win the majority of games up to 1 + x/2 (used for byes).
-		 * @type {Number}
-		 * @default 1
-		 */
-		this.bestOf =
-			options.hasOwnProperty("bestOf") && Number.isInteger(options.bestOf) && options.bestOf % 2 === 1
-				? options.bestOf
-				: 1;
+		this.bestOf = options.bestOf && Number.isInteger(options.bestOf) && options.bestOf % 2 === 1 ? options.bestOf : 1;
 
-		/**
-		 * Method to determine which players advance to the second stage of the tournament.
-		 * @type {('rank'|'points')}
-		 * @default 'rank'
-		 */
-		this.cutType = options.hasOwnProperty("cutType") && options.cutType === "points" ? "points" : "rank";
+		this.cutType = options.cutType && options.cutType === "points" ? "points" : "rank";
 
-		/**
-		 * Breakpoint for determining how many players advance to the second stage of the tournament.
-		 * If 0, it will override the playoff format to null.
-		 * If -1, all players will advance.
-		 * @type {Number}
-		 * @default 0
-		 */
 		this.cutLimit =
-			options.hasOwnProperty("cutLimit") && Number.isInteger(options.cutLimit) && options.cutLimit >= -1
-				? options.cutLimit
-				: 0;
+			options.cutLimit && Number.isInteger(options.cutLimit) && options.cutLimit >= -1 ? options.cutLimit : 0;
 		if (this.cutLimit === 0) this.playoffs = null;
 
-		const tiebreakerOptions = [
-			"buchholz-cut1",
-			"solkoff",
-			"median-buchholz",
-			"sonneborn-berger",
-			"cumulative",
-			"versus",
-			"magic-tcg",
-			"pokemon-tcg"
-		];
-		/**
-		 * Array of tiebreakers to use, in order of precedence.
-		 * Options include: buchholz-cut1, solkoff, median-buchholz, sonneborn-berger, cumulative, versus, magic-tcg, pokemon-tcg.
-		 * Defaults for Swiss and Dutch are solkoff and cumulative.
-		 * @type {String[]}
-		 * @default null
-		 */
-		this.tiebreakers =
-			options.hasOwnProperty("tiebreakers") && Array.isArray(options.tiebreakers)
-				? options.tiebreakers.filter(t => tiebreakerOptions.includes(t))
-				: null;
+		this.tiebreakers = options.tiebreakers || null;
 
 		// Validating tiebreakers.
 		if (this.tiebreakers === null || this.tiebreakers.length === 0) this.tiebreakers = ["solkoff", "cumulative"];
 		this.tiebreakers.unshift("match-points");
 
-		/**
-		 * If the Dutch variant of Swiss pairings should be used.
-		 * @type {Boolean}
-		 * @default false
-		 */
-		this.dutch = options.hasOwnProperty("dutch") && typeof options.dutch === "boolean" ? options.dutch : false;
+		this.dutch = !!options.dutch;
 
-		/**
-		 * Current round number.
-		 * 0 if the tournament has not started, -1 if the tournament is finished.
-		 * @type {Number}
-		 * @default 0
-		 */
 		this.currentRound = 0;
 
-		/**
-		 * If the event is ready to proceed to the next round.
-		 * @type {Boolean}
-		 * @default false
-		 */
 		this.nextRoundReady = false;
 	}
 
@@ -418,7 +490,7 @@ class Swiss extends Tournament {
 	 * @param {Number} [draws=0] Number of draws.
 	 * @returns {?Match[]} Array of new matches, or null if result failed.
 	 */
-	result(match, playerOneWins, playerTwoWins, draws = 0) {
+	result(match: Match, playerOneWins: number, playerTwoWins: number, draws: number = 0): Match[] | null {
 		if (!this.active) return null;
 		if (!match.active && match.playerOne !== null && match.playerTwo !== null) {
 			match.resetResults(this.winValue, this.lossValue, this.drawValue);
@@ -437,7 +509,7 @@ class Swiss extends Tournament {
 		match.resultForPlayers(this.winValue, this.lossValue, this.drawValue);
 		let active = this.activeMatches();
 		let newMatches = [];
-		if (this.currentRound > this.numberOfRounds) {
+		if (this.currentRound > this.numberOfRounds!) {
 			if (match.winnerPath !== null) {
 				if (match.winnerPath.playerOne === null)
 					match.winnerPath.playerOne = playerOneWins >= playerTwoWins ? match.playerOne : match.playerTwo;
@@ -460,7 +532,7 @@ class Swiss extends Tournament {
 			}
 			if (match.loserPath === null) {
 				if (playerOneWins > playerTwoWins) this.removePlayer(match.playerTwo);
-				else if (playerTwoWins > playerOneWins) this.removePlayer(match.playerOne);
+				else if (playerTwoWins > playerOneWins) this.removePlayer(match.playerOne!);
 			}
 			active = this.activeMatches();
 			this.currentRound = active.length === 0 ? -1 : active.reduce((x, y) => Math.min(x, y.round), active[0].round);
@@ -474,9 +546,9 @@ class Swiss extends Tournament {
 	 * Starts the next round, if there are no active matches
 	 * @return {(Match[]|Boolean)} Array of new matches, or false if not ready to start the new round.
 	 */
-	nextRound() {
+	nextRound(): Match[] | boolean {
 		if (!this.nextRoundReady) return false;
-		let newMatches = [];
+		let newMatches: Match[] = [];
 		this.nextRoundReady = false;
 		if (this.currentRound === this.numberOfRounds) {
 			if (this.playoffs !== null) {
@@ -501,7 +573,7 @@ class Swiss extends Tournament {
 					);
 				newMatches = this.activeMatches();
 			} else this.active = false;
-		} else if (this.currentRound > this.numberOfRounds || this.currentRound === -1) this.active = false;
+		} else if (this.currentRound > this.numberOfRounds! || this.currentRound === -1) this.active = false;
 		else {
 			this.currentRound++;
 			if (this.dutch)
@@ -533,26 +605,33 @@ class Swiss extends Tournament {
 	}
 }
 
+interface TournamentSerialised {
+	id: string;
+	players?: Player[];
+	matches?: Match[];
+	groups?: Player[][];
+}
+
 /**
  * Class recreating a Swiss pairing tournament from an existing object.
  * @extends Swiss
  */
-class SwissReloaded extends Swiss {
-	constructor(tournament) {
+export class SwissReloaded extends Swiss {
+	constructor(tournament: TournamentSerialised) {
 		super(tournament.id);
-		["players", "matches"].forEach(
-			prop => (tournament[prop] = tournament.hasOwnProperty(prop) ? tournament[prop] : [])
-		);
+		tournament.players ||= [];
+		tournament.matches ||= [];
+
 		Object.assign(this, tournament);
 		this.players = this.players.map(p => new Player(p));
 		this.matches = this.matches.map(m => new Match(m));
 		this.matches.forEach(m => {
 			if (m.playerOne !== undefined) {
-				const p1 = this.players.find(p => m.playerOne.id === p.id);
+				const p1 = this.players.find(p => m.playerOne!.id === p.id);
 				if (p1 !== undefined) m.playerOne = p1;
 			}
 			if (m.playerTwo !== undefined) {
-				const p2 = this.players.find(p => m.playerTwo.id === p.id);
+				const p2 = this.players.find(p => m.playerTwo!.id === p.id);
 				if (p2 !== undefined) m.playerTwo = p2;
 			}
 		});
@@ -563,13 +642,29 @@ class SwissReloaded extends Swiss {
  * Class representing a round-robin pairing tournament.
  * @extends Tournament
  */
-class RoundRobin extends Tournament {
+export class RoundRobin extends Tournament {
+	playoffs: "elim" | "2xelim" | null;
+	bestOf: number;
+	cutType: "rank" | "points";
+	cutLimit: number;
+	private groupNumber: number | null;
+	private cutEachGroup: boolean;
+	tiebreakers: TiebreakerOption[] | null;
+	private doubleRR: boolean;
+	private groups: Player[][];
+	// dummy inherit for abstract properties
+	currentRound;
+	doubleElim = false;
+	dutch = false;
+	nextRoundReady;
+	numberOfRounds = -1;
+
 	/**
 	 * Create a new round-robin pairing tournament.
 	 * @param {String} id String to be the event ID.
 	 * @param {Object} [options={}] Options that can be defined for a tournament.
 	 */
-	constructor(id, options = {}) {
+	constructor(id: string, options: Options = {}) {
 		super(id, options);
 
 		/**
@@ -578,25 +673,21 @@ class RoundRobin extends Tournament {
 		 * @type {?('elim'|'2xelim')}
 		 * @default null
 		 */
-		this.playoffs =
-			options.hasOwnProperty("playoffs") && ["elim", "2xelim"].includes(options.playoffs) ? options.playoffs : null;
+		this.playoffs = options.playoffs || null;
 
 		/**
 		 * Number of possible games for a match, where the winner must win the majority of games up to 1 + x/2 (used for byes).
 		 * @type {Number}
 		 * @default 1
 		 */
-		this.bestOf =
-			options.hasOwnProperty("bestOf") && Number.isInteger(options.bestOf) && options.bestOf % 2 === 1
-				? options.bestOf
-				: 1;
+		this.bestOf = options.bestOf && Number.isInteger(options.bestOf) && options.bestOf % 2 === 1 ? options.bestOf : 1;
 
 		/**
 		 * Method to determine which players advance to the second stage of the tournament.
 		 * @type {('rank'|'points')}
 		 * @default 'rank'
 		 */
-		this.cutType = options.hasOwnProperty("cutType") && options.cutType === "points" ? "points" : "rank";
+		this.cutType = options.cutType && options.cutType === "points" ? "points" : "rank";
 
 		/**
 		 * Breakpoint for determining how many players advance to the second stage of the tournament.
@@ -606,9 +697,7 @@ class RoundRobin extends Tournament {
 		 * @default 0
 		 */
 		this.cutLimit =
-			options.hasOwnProperty("cutLimit") && Number.isInteger(options.cutLimit) && options.cutLimit >= -1
-				? options.cutLimit
-				: 0;
+			options.cutLimit && Number.isInteger(options.cutLimit) && options.cutLimit >= -1 ? options.cutLimit : 0;
 		if (this.cutLimit === 0) this.playoffs = null;
 
 		/**
@@ -618,7 +707,7 @@ class RoundRobin extends Tournament {
 		 * @default null
 		 */
 		this.groupNumber =
-			options.hasOwnProperty("groupNumber") && Number.isInteger(options.groupNumber) && options.groupNumber >= 2
+			options.groupNumber && Number.isInteger(options.groupNumber) && options.groupNumber >= 2
 				? options.groupNumber
 				: null;
 
@@ -628,10 +717,7 @@ class RoundRobin extends Tournament {
 		 * @type {Boolean}
 		 * @default false
 		 */
-		this.cutEachGroup =
-			this.cutType === "rank" && options.hasOwnProperty("cutEachGroup") && typeof options.cutEachGroup === "boolean"
-				? options.cutEachGroup
-				: false;
+		this.cutEachGroup = this.cutType === "rank" && !!options.cutEachGroup;
 
 		const tiebreakerOptions = [
 			"buchholz-cut1",
@@ -650,10 +736,7 @@ class RoundRobin extends Tournament {
 		 * @type {String[]}
 		 * @default null
 		 */
-		this.tiebreakers =
-			options.hasOwnProperty("tiebreakers") && Array.isArray(options.tiebreakers)
-				? options.tiebreakers.filter(t => tiebreakerOptions.includes(t))
-				: null;
+		this.tiebreakers = options.tiebreakers || null;
 
 		// Validating tiebreakers.
 		if (this.tiebreakers === null || this.tiebreakers.length === 0) this.tiebreakers = ["sonneborn-berger", "versus"];
@@ -664,8 +747,7 @@ class RoundRobin extends Tournament {
 		 * @type {Boolean}
 		 * @default false
 		 */
-		this.doubleRR =
-			options.hasOwnProperty("doubleRR") && typeof options.doubleRR === "boolean" ? options.doubleRR : false;
+		this.doubleRR = !!options.doubleRR;
 
 		/**
 		 * Array of groups of players.
@@ -696,7 +778,8 @@ class RoundRobin extends Tournament {
 	startEvent() {
 		if (this.players.length < 2) return;
 		this.active = true;
-		if (this.seededPlayers) this.players.sort((a, b) => (this.seedOrder === "asc" ? a.seed - b.seed : b.seed - a.seed));
+		if (this.seededPlayers)
+			this.players.sort((a, b) => (this.seedOrder === "asc" ? a.seed! - b.seed! : b.seed! - a.seed!));
 		else Utilities.shuffle(this.players);
 		if (typeof this.groupNumber === "number") {
 			const numberOfGroups = Math.ceil(this.players.length / this.groupNumber);
@@ -721,8 +804,8 @@ class RoundRobin extends Tournament {
 					j++;
 				}
 			}
-			this.matches = Algorithms.robin(this.groups, true, this.doubleRR);
-		} else this.matches = Algorithms.robin(this.players, false, this.doubleRR);
+			this.matches = Algorithms.robin(this.groups, this.doubleRR);
+		} else this.matches = Algorithms.robin(this.players, this.doubleRR);
 		this.currentRound++;
 		const byes = this.matches.filter(
 			r => r.round === this.currentRound && (r.playerOne === null || r.playerTwo === null)
@@ -743,7 +826,7 @@ class RoundRobin extends Tournament {
 	 * @param {Number} [draws=0] Number of draws.
 	 * @returns {?Match[]} Array of new matches, or null if result failed.
 	 */
-	result(match, playerOneWins, playerTwoWins, draws = 0) {
+	result(match: Match, playerOneWins: number, playerTwoWins: number, draws: number = 0): Match[] | null {
 		if (!this.active) return null;
 		if (!match.active && match.playerOne !== null && match.playerTwo !== null) {
 			match.resetResults(this.winValue, this.lossValue, this.drawValue);
@@ -803,9 +886,9 @@ class RoundRobin extends Tournament {
 	 * Starts the next round, if there are no active matches
 	 * @return {(Match[]|Boolean)} Array of new matches, or false if not ready to start the new round.
 	 */
-	nextRound() {
+	nextRound(): Match[] | boolean {
 		if (!this.nextRoundReady) return false;
-		let newMatches = [];
+		let newMatches: Match[] = [];
 		this.nextRoundReady = false;
 		if (this.currentRound === this.numberOfRounds) {
 			if (this.playoffs !== null) {
@@ -851,19 +934,20 @@ class RoundRobin extends Tournament {
 	 * @param {Boolean} [active=true] Filtering only active players.
 	 * @return {Player[]}
 	 */
-	groupStandings(group, active = true) {
+	groupStandings(group: Player[], active: boolean = true): Player[] {
 		group.forEach(p => Tiebreakers.compute(p, this));
 		let thesePlayers = active ? group.filter(p => p.active) : [...group];
 		thesePlayers.sort((a, b) => {
-			for (let i = 0; i < this.tiebreakers.length; i++) {
-				const prop = this.tiebreakers[i].replace("-", "");
-				const eqCheck = Tiebreakers[prop].equal(a, b);
+			for (let i = 0; i < this.tiebreakers!.length; i++) {
+				const prop = this.tiebreakers![i].replace("-", "");
+				const eqCheck = Tiebreakers.default[prop].equal(a, b);
 				if (eqCheck === true) {
-					if (i === this.tiebreakers.length - 1) return Math.random() * 2 - 1;
+					if (i === this.tiebreakers!.length - 1) return Math.random() * 2 - 1;
 					else continue;
-				} else if (typeof eqCheck === "number") return Tiebreakers[prop].diff(a, b, eqCheck);
-				else return Tiebreakers[prop].diff(a, b);
+				} else if (typeof eqCheck === "number") return Tiebreakers.default[prop].diff(a, b, eqCheck);
+				else return Tiebreakers.default[prop].diff(a, b);
 			}
+			return 0; // should not occur
 		});
 		return thesePlayers;
 	}
@@ -873,22 +957,23 @@ class RoundRobin extends Tournament {
  * Class recreating a round-robin pairing tournament from an existing object.
  * @extends RoundRobin
  */
-class RoundRobinReloaded extends RoundRobin {
-	constructor(tournament) {
+export class RoundRobinReloaded extends RoundRobin {
+	constructor(tournament: TournamentSerialised) {
 		super(tournament.id);
-		["players", "matches", "groups"].forEach(
-			prop => (tournament[prop] = tournament.hasOwnProperty(prop) ? tournament[prop] : [])
-		);
+		tournament.matches ||= [];
+		tournament.players ||= [];
+		tournament.groups ||= [];
+
 		Object.assign(this, tournament);
 		this.players = this.players.map(p => new Player(p));
 		this.matches = this.matches.map(m => new Match(m));
 		this.matches.forEach(m => {
 			if (m.playerOne !== undefined) {
-				const p1 = this.players.find(p => m.playerOne.id === p.id);
+				const p1 = this.players.find(p => m.playerOne!.id === p.id);
 				if (p1 !== undefined) m.playerOne = p1;
 			}
 			if (m.playerTwo !== undefined) {
-				const p2 = this.players.find(p => m.playerTwo.id === p.id);
+				const p2 = this.players.find(p => m.playerTwo!.id === p.id);
 				if (p2 !== undefined) m.playerTwo = p2;
 			}
 		});
@@ -899,22 +984,27 @@ class RoundRobinReloaded extends RoundRobin {
  * Class representing an elimination tournament.
  * @extends Tournament
  */
-class Elimination extends Tournament {
+export class Elimination extends Tournament {
+	doubleElim: boolean;
+	tiebreakers: TiebreakerOption[];
+	// dummy inherits for abstract
+	bestOf = -1;
+	currentRound = -1;
+	cutLimit = -1;
+	dutch = false;
+	nextRoundReady = false;
+	cutType: "rank" | "points" = "rank";
+	numberOfRounds = null;
+	playoffs = null;
 	/**
 	 * Create a new elimination tournament.
 	 * @param {String} id String to be the event ID.
 	 * @param {Object} [options={}] Options that can be defined for a tournament.
 	 */
-	constructor(id, options = {}) {
+	constructor(id: string, options: Options = {}) {
 		super(id, options);
 
-		/**
-		 * If the format is double elimination.
-		 * @type {Boolean}
-		 * @default false
-		 */
-		this.doubleElim =
-			options.hasOwnProperty("doubleElim") && typeof options.doubleElim === "boolean" ? options.doubleElim : false;
+		this.doubleElim = !!options.doubleElim;
 
 		this.tiebreakers = ["match-points"];
 	}
@@ -925,23 +1015,21 @@ class Elimination extends Tournament {
 	startEvent() {
 		if (this.players.length < 2) return;
 		this.active = true;
-		if (this.seededPlayers) this.players.sort((a, b) => (this.seedOrder === "asc" ? a.seed - b.seed : b.seed - a.seed));
+		if (this.seededPlayers)
+			this.players.sort((a, b) => (this.seedOrder === "asc" ? a.seed! - b.seed! : b.seed! - a.seed!));
 		else Utilities.shuffle(this.players);
 		this.doubleElim
 			? Algorithms.doubleElim(this.matches, this.players)
 			: Algorithms.elim(this.matches, this.players, this.thirdPlaceMatch);
 	}
 
-	/**
-	 * Storing results of a match.
-	 * @param {Match} match The match being reported.
-	 * @param {Number} playerOneWins Number of wins for player one.
-	 * @param {Number} playerTwoWins Number of wins for player two.
-	 * @param {Number} [draws=0] Number of draws.
-	 * @param {Boolean} [dropdown=true] Whether or not to drop the player into loser's bracket in double elimination.
-	 * @returns {?Match[]} Array of new matches, or null if result failed.
-	 */
-	result(match, playerOneWins, playerTwoWins, draws = 0, dropdown = true) {
+	result(
+		match: Match,
+		playerOneWins: number,
+		playerTwoWins: number,
+		draws: number = 0,
+		dropdown: boolean = true
+	): Match[] | null {
 		if (!this.active) return null;
 		if (match.playerTwo === undefined) match.assignBye(1, this.winValue);
 		else {
@@ -968,7 +1056,7 @@ class Elimination extends Tournament {
 			else if (match.loserPath.playerTwo === null)
 				match.loserPath.playerTwo = playerOneWins < playerTwoWins ? match.playerOne : match.playerTwo;
 			if (match.loserPath.playerTwo === undefined) {
-				let matchesFromDrop = this.result(match.loserPath, 2, 0);
+				let matchesFromDrop = this.result(match.loserPath, 2, 0)!;
 				matchesFromDrop.forEach(m => newMatches.push(m));
 			}
 			if (
@@ -981,8 +1069,8 @@ class Elimination extends Tournament {
 			}
 		}
 		if (match.loserPath === null && match.playerTwo !== undefined) {
-			if (playerOneWins > playerTwoWins) this.removePlayer(match.playerTwo);
-			else if (playerTwoWins > playerOneWins) this.removePlayer(match.playerOne);
+			if (playerOneWins > playerTwoWins) this.removePlayer(match.playerTwo!);
+			else if (playerTwoWins > playerOneWins) this.removePlayer(match.playerOne!);
 		}
 		if (this.activeMatches().length === 0) this.active = false;
 		return newMatches;
@@ -993,31 +1081,21 @@ class Elimination extends Tournament {
  * Class recreating an elimination tournament from an existing object.
  * @extends Elimination
  */
-class EliminationReloaded extends Elimination {
-	constructor(tournament) {
+export class EliminationReloaded extends Elimination {
+	constructor(tournament: TournamentSerialised) {
 		super(tournament.id);
 		Object.assign(this, tournament);
 		this.players = this.players.map(p => new Player(p));
 		this.matches = this.matches.map(m => new Match(m));
 		this.matches.forEach(m => {
 			if (m.playerOne !== undefined) {
-				const p1 = this.players.find(p => m.playerOne.id === p.id);
+				const p1 = this.players.find(p => m.playerOne!.id === p.id);
 				if (p1 !== undefined) m.playerOne = p1;
 			}
 			if (m.playerTwo !== undefined) {
-				const p2 = this.players.find(p => m.playerTwo.id === p.id);
+				const p2 = this.players.find(p => m.playerTwo!.id === p.id);
 				if (p2 !== undefined) m.playerTwo = p2;
 			}
 		});
 	}
 }
-
-module.exports = {
-	Tournament,
-	Swiss,
-	SwissReloaded,
-	RoundRobin,
-	RoundRobinReloaded,
-	Elimination,
-	EliminationReloaded
-};
