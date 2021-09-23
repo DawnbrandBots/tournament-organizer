@@ -1,7 +1,7 @@
-interface Result {
-	matchId: string;
-	opponentId: string;
-	result: "w" | "l" | "d";
+export interface Result {
+	match: string;
+	opponent: string;
+	result?: "w" | "l" | "d";
 }
 
 /** Class representing a player. */
@@ -16,7 +16,7 @@ export class Player {
 	 * Alphanumeric string ID.
 	 * @type {String}
 	 */
-	private id: string;
+	readonly id: string;
 
 	/**
 	 * Value to sort players.
@@ -28,25 +28,25 @@ export class Player {
 	 * Number of match points the player has.
 	 * @type {Number}
 	 */
-	private matchPoints: number;
+	public matchPoints: number;
 
 	/**
 	 * Number of matches played.
 	 * @type {Number}
 	 */
-	private matches: number;
+	public matches: number;
 
 	/**
 	 * Number of game points the player has.
 	 * @type {Number}
 	 */
-	private gamePoints: number;
+	public gamePoints: number;
 
 	/**
 	 * Number of games played.
 	 * @type {Number}
 	 */
-	private games: number;
+	public games: number;
 
 	/**
 	 * Number of initial byes assigned.
@@ -58,13 +58,13 @@ export class Player {
 	 * Number of byes assigned.
 	 * @type {Number}
 	 */
-	private byes: number;
+	public byes: number;
 
 	/**
 	 * Array of results. Objects include match ID, opponent ID, and result ('w', 'l', or 'd').
 	 * @type {Object[]}
 	 */
-	private results: Result[];
+	public results: Result[];
 
 	/**
 	 * Color preference for chess tournaments.
@@ -118,7 +118,7 @@ export class Player {
 	 * @param {String} id String to be the player ID.
 	 * @param {?Number} seed Number to be used as the seed.
 	 */
-	constructor(alias: string | object, id: string, seed: number | null) {
+	constructor(alias: string | Player, id: string, seed: number | null) {
 		if (arguments.length === 1) {
 			const oldPlayer: Player = arguments[0];
 			// manually set defaults to satisfy ts

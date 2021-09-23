@@ -1,7 +1,75 @@
-"use strict";
+import { Player, Result } from "./Player";
 
 /** Class representing a match. */
-class Match {
+export class Match {
+	/**
+	 * Unique ID for the match.
+	 * @type {String}
+	 */
+	private id: string;
+	/**
+	 * Round number for the match.
+	 * @type {Number}
+	 */
+	private round: number;
+	/**
+	 * Match number.
+	 * @type {Number}
+	 */
+	private matchNumber: number;
+	/**
+	 * Player number one in the match.
+	 * If null, the player has not been determined.
+	 * @type {?Player}
+	 * @default null
+	 */
+	private playerOne: Player | null;
+	/**
+	 * Player number two in the match.
+	 * If null, the player has not been determined.
+	 * @type {?Player}
+	 * @default null
+	 */
+	private playerTwo: Player | null;
+	/**
+	 * The status of the match.
+	 * @type {Boolean}
+	 * @default false
+	 */
+	private active: boolean;
+	/**
+	 * Number of wins for player one.
+	 * @type {Number}
+	 * @default 0
+	 */
+	private playerOneWins: number;
+	/**
+	 * Number of wins for player two.
+	 * @type {Number}
+	 * @default 0
+	 */
+	private playerTwoWins: number;
+	/**
+	 * Number of draws.
+	 * @type {Number}
+	 * @default 0
+	 */
+	private draws: number;
+	/**
+	 * Next match for the winner.
+	 * Used in elimination formats.
+	 * @type {?Match}
+	 * @default null
+	 */
+	private winnerPath: Match | null;
+	/**
+	 * Next match for the loser.
+	 * Used in elimination formats.
+	 * @type {?Match}
+	 * @default null
+	 */
+	private loserPath: Match | null;
+
 	/**
 	 * Create a new match.
 	 * @param {String|Object} id The unique ID for the match. If an object, it is a match being reclassed.
@@ -9,42 +77,28 @@ class Match {
 	 * @param {Number} matchNumber The match number.
 	 * @param {?Player[]} players Array of players for the match.
 	 */
-	constructor(id, round, matchNumber, players = null) {
+	constructor(id: string | Match, round: number, matchNumber: number, players: Player[] | null = null) {
 		if (arguments.length === 1) {
-			Object.assign(this, arguments[0]);
+			// manual assign for ts
+			const oldMatch: Match = arguments[0];
+			this.id = oldMatch.id;
+			this.round = oldMatch.round;
+			this.matchNumber = oldMatch.matchNumber;
+			this.playerOne = oldMatch.playerOne;
+			this.playerTwo = oldMatch.playerTwo;
+			this.active = oldMatch.active;
+			this.playerOneWins = oldMatch.playerOneWins;
+			this.playerTwoWins = oldMatch.playerTwoWins;
+			this.draws = oldMatch.draws;
+			this.winnerPath = oldMatch.winnerPath;
+			this.loserPath = oldMatch.loserPath;
 		} else {
-			/**
-			 * Unique ID for the match.
-			 * @type {String}
-			 */
-			this.id = id;
-
-			/**
-			 * Round number for the match.
-			 * @type {Number}
-			 */
+			this.id = id.toString();
 			this.round = round;
-
-			/**
-			 * Match number.
-			 * @type {Number}
-			 */
 			this.matchNumber = matchNumber;
 
-			/**
-			 * Player number one in the match.
-			 * If null, the player has not been determined.
-			 * @type {?Player}
-			 * @default null
-			 */
 			this.playerOne = null;
 
-			/**
-			 * Player number two in the match.
-			 * If null, the player has not been determined.
-			 * @type {?Player}
-			 * @default null
-			 */
 			this.playerTwo = null;
 
 			// Setting players if in the constructor.
@@ -53,48 +107,16 @@ class Match {
 				this.playerTwo = players[1];
 			}
 
-			/**
-			 * The status of the match.
-			 * @type {Boolean}
-			 * @default false
-			 */
 			this.active = false;
 
-			/**
-			 * Number of wins for player one.
-			 * @type {Number}
-			 * @default 0
-			 */
 			this.playerOneWins = 0;
 
-			/**
-			 * Number of wins for player two.
-			 * @type {Number}
-			 * @default 0
-			 */
 			this.playerTwoWins = 0;
 
-			/**
-			 * Number of draws.
-			 * @type {Number}
-			 * @default 0
-			 */
 			this.draws = 0;
 
-			/**
-			 * Next match for the winner.
-			 * Used in elimination formats.
-			 * @type {?Match}
-			 * @default null
-			 */
 			this.winnerPath = null;
 
-			/**
-			 * Next match for the loser.
-			 * Used in elimination formats.
-			 * @type {?Match}
-			 * @default null
-			 */
 			this.loserPath = null;
 		}
 	}
@@ -105,33 +127,33 @@ class Match {
 	 * @param {Number} lv The value of a loss.
 	 * @param {Number} dv The value of a draw.
 	 */
-	resultForPlayers(wv, lv, dv) {
-		this.playerOne.gamePoints += this.playerOneWins * wv + this.draws * dv;
-		this.playerTwo.gamePoints += this.playerTwoWins * wv + this.draws * dv;
-		this.playerOne.games += this.playerOneWins + this.playerTwoWins + this.draws;
-		this.playerTwo.games += this.playerOneWins + this.playerTwoWins + this.draws;
-		let playerOneResult = { match: this.id, opponent: this.playerTwo.id };
-		let playerTwoResult = { match: this.id, opponent: this.playerOne.id };
+	resultForPlayers(wv: number, lv: number, dv: number) {
+		this.playerOne!.gamePoints += this.playerOneWins * wv + this.draws * dv;
+		this.playerTwo!.gamePoints += this.playerTwoWins * wv + this.draws * dv;
+		this.playerOne!.games += this.playerOneWins + this.playerTwoWins + this.draws;
+		this.playerTwo!.games += this.playerOneWins + this.playerTwoWins + this.draws;
+		let playerOneResult: Result = { match: this.id, opponent: this.playerTwo!.id };
+		let playerTwoResult: Result = { match: this.id, opponent: this.playerOne!.id };
 		if (this.playerOneWins > this.playerTwoWins) {
-			this.playerOne.matchPoints += wv;
+			this.playerOne!.matchPoints += wv;
 			playerOneResult.result = "w";
-			this.playerTwo.matchPoints += lv;
+			this.playerTwo!.matchPoints += lv;
 			playerTwoResult.result = "l";
 		} else if (this.playerOneWins < this.playerTwoWins) {
-			this.playerOne.matchPoints += lv;
+			this.playerOne!.matchPoints += lv;
 			playerOneResult.result = "l";
-			this.playerTwo.matchPoints += wv;
+			this.playerTwo!.matchPoints += wv;
 			playerTwoResult.result = "w";
 		} else {
-			this.playerOne.matchPoints += dv;
+			this.playerOne!.matchPoints += dv;
 			playerOneResult.result = "d";
-			this.playerTwo.matchPoints += dv;
+			this.playerTwo!.matchPoints += dv;
 			playerTwoResult.result = "d";
 		}
-		this.playerOne.matches++;
-		this.playerTwo.matches++;
-		this.playerOne.results.push(playerOneResult);
-		this.playerTwo.results.push(playerTwoResult);
+		this.playerOne!.matches++;
+		this.playerTwo!.matches++;
+		this.playerOne!.results.push(playerOneResult);
+		this.playerTwo!.results.push(playerTwoResult);
 	}
 
 	/**
@@ -140,29 +162,29 @@ class Match {
 	 * @param {Number} lv The value of a loss.
 	 * @param {Number} dv The value of a draw.
 	 */
-	resetResults(wv, lv, dv) {
-		this.playerOne.gamePoints -= this.playerOneWins * wv + this.draws * dv;
-		this.playerTwo.gamePoints -= this.playerTwoWins * wv + this.draws * dv;
-		this.playerOne.games -= this.playerOneWins + this.playerTwoWins + this.draws;
-		this.playerTwo.games -= this.playerOneWins + this.playerTwoWins + this.draws;
+	resetResults(wv: number, lv: number, dv: number) {
+		this.playerOne!.gamePoints -= this.playerOneWins * wv + this.draws * dv;
+		this.playerTwo!.gamePoints -= this.playerTwoWins * wv + this.draws * dv;
+		this.playerOne!.games -= this.playerOneWins + this.playerTwoWins + this.draws;
+		this.playerTwo!.games -= this.playerOneWins + this.playerTwoWins + this.draws;
 		if (this.playerOneWins > this.playerTwoWins) {
-			this.playerOne.matchPoints -= wv;
-			this.playerTwo.matchPoints -= lv;
+			this.playerOne!.matchPoints -= wv;
+			this.playerTwo!.matchPoints -= lv;
 		} else if (this.playerOneWins < this.playerTwoWins) {
-			this.playerOne.matchPoints -= lv;
-			this.playerTwo.matchPoints -= wv;
+			this.playerOne!.matchPoints -= lv;
+			this.playerTwo!.matchPoints -= wv;
 		} else {
-			this.playerOne.matchPoints -= dv;
-			this.playerTwo.matchPoints -= dv;
+			this.playerOne!.matchPoints -= dv;
+			this.playerTwo!.matchPoints -= dv;
 		}
-		this.playerOne.matches--;
-		this.playerTwo.matches--;
-		this.playerOne.results.splice(
-			this.playerOne.results.findIndex(a => a.match === this.id),
+		this.playerOne!.matches--;
+		this.playerTwo!.matches--;
+		this.playerOne!.results.splice(
+			this.playerOne!.results.findIndex(a => a.match === this.id),
 			1
 		);
-		this.playerTwo.results.splice(
-			this.playerTwo.results.findIndex(a => a.match === this.id),
+		this.playerTwo!.results.splice(
+			this.playerTwo!.results.findIndex(a => a.match === this.id),
 			1
 		);
 	}
@@ -172,21 +194,19 @@ class Match {
 	 * @param {1|2} player Which player in the match gets a bye.
 	 * @param {Number} wv The value of a win.
 	 */
-	assignBye(player, wv) {
+	assignBye(player: 1 | 2, wv: number) {
 		if (player === 1) {
-			this.playerOne.gamePoints += this.playerOneWins * wv;
-			this.playerOne.games += this.playerOneWins;
-			this.playerOne.matchPoints += wv;
-			this.playerOne.matches++;
-			this.playerOne.byes++;
+			this.playerOne!.gamePoints += this.playerOneWins * wv;
+			this.playerOne!.games += this.playerOneWins;
+			this.playerOne!.matchPoints += wv;
+			this.playerOne!.matches++;
+			this.playerOne!.byes++;
 		} else {
-			this.playerTwo.gamePoints += this.playerTwoWins * wv;
-			this.playerTwo.games += this.playerTwoWins;
-			this.playerTwo.matchPoints += wv;
-			this.playerTwo.matches++;
-			this.playerTwo.byes++;
+			this.playerTwo!.gamePoints += this.playerTwoWins * wv;
+			this.playerTwo!.games += this.playerTwoWins;
+			this.playerTwo!.matchPoints += wv;
+			this.playerTwo!.matches++;
+			this.playerTwo!.byes++;
 		}
 	}
 }
-
-module.exports = Match;
