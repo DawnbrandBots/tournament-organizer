@@ -1,20 +1,13 @@
-"use strict";
-
-const Tournament = require("./Tournament");
-const Utilities = require("../lib/Utilities");
+import * as Tournament from "./Tournament";
+import * as Utilities from "../lib/Utilities";
 
 /** Class representing an event manager. */
-class EventManager {
+export class EventManager {
 	/**
-	 * Create an event manager.
+	 * Array of all tournaments being managed.
+	 * @type {Array.<Tournament>}
 	 */
-	constructor() {
-		/**
-		 * Array of all tournaments being managed.
-		 * @type {Array.<Tournament>}
-		 */
-		this.tournaments = [];
-	}
+	private tournaments: Tournament.Tournament[] = [];
 
 	/**
 	 * Create a new tournament.
@@ -22,8 +15,8 @@ class EventManager {
 	 * @param {Object} [options={}] Options a user can define for a tournament.
 	 * @return {Tournament} The newly created tournament.
 	 */
-	createTournament(id = null, options = {}) {
-		let thisid;
+	createTournament(id: string | null = null, options: Tournament.Options = {}): Tournament.Tournament {
+		let thisid: string;
 		if (id === null) {
 			do {
 				thisid = Utilities.randomString(16);
@@ -42,7 +35,7 @@ class EventManager {
 		return tournament;
 	}
 
-	reloadTournament(tournament) {
+	reloadTournament(tournament: Tournament.Tournament) {
 		let reloadedTournament;
 		if (tournament.format === "swiss") reloadedTournament = new Tournament.SwissReloaded(tournament);
 		else if (tournament.format === "robin") reloadedTournament = new Tournament.RoundRobinReloaded(tournament);
@@ -55,7 +48,7 @@ class EventManager {
 	 * @param {Tournament} tournament The tournament to be removed.
 	 * @return {Boolean} If the tournament was removed.
 	 */
-	removeTournament(tournament) {
+	removeTournament(tournament: Tournament.Tournament): boolean {
 		const index = this.tournaments.findIndex(t => t.eventID === tournament.eventID);
 		if (index > -1) {
 			this.tournaments.splice(index, 1);
@@ -63,5 +56,3 @@ class EventManager {
 		} else return false;
 	}
 }
-
-module.exports = EventManager;
