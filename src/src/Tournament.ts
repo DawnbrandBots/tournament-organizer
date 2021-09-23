@@ -47,7 +47,7 @@ export abstract class Tournament {
 	 * Alphanumeric string ID.
 	 * @type {String}
 	 */
-	private eventID: string;
+	readonly eventID: string;
 
 	/**
 	 * Name of the tournament.
@@ -75,7 +75,7 @@ export abstract class Tournament {
 	 * @type {('elim'|'robin'|'swiss')}
 	 * @default 'elim'
 	 */
-	private format: "elim" | "robin" | "swiss";
+	readonly format: "elim" | "robin" | "swiss";
 
 	/**
 	 * If there is a third place consolation match.
@@ -605,20 +605,13 @@ export class Swiss extends Tournament {
 	}
 }
 
-interface TournamentSerialised {
-	id: string;
-	players?: Player[];
-	matches?: Match[];
-	groups?: Player[][];
-}
-
 /**
  * Class recreating a Swiss pairing tournament from an existing object.
  * @extends Swiss
  */
 export class SwissReloaded extends Swiss {
-	constructor(tournament: TournamentSerialised) {
-		super(tournament.id);
+	constructor(tournament: Swiss) {
+		super(tournament.eventID);
 		tournament.players ||= [];
 		tournament.matches ||= [];
 
@@ -651,7 +644,7 @@ export class RoundRobin extends Tournament {
 	private cutEachGroup: boolean;
 	tiebreakers: TiebreakerOption[] | null;
 	private doubleRR: boolean;
-	private groups: Player[][];
+	public groups: Player[][];
 	// dummy inherit for abstract properties
 	currentRound;
 	doubleElim = false;
@@ -958,8 +951,8 @@ export class RoundRobin extends Tournament {
  * @extends RoundRobin
  */
 export class RoundRobinReloaded extends RoundRobin {
-	constructor(tournament: TournamentSerialised) {
-		super(tournament.id);
+	constructor(tournament: RoundRobin) {
+		super(tournament.eventID);
 		tournament.matches ||= [];
 		tournament.players ||= [];
 		tournament.groups ||= [];
@@ -1082,8 +1075,8 @@ export class Elimination extends Tournament {
  * @extends Elimination
  */
 export class EliminationReloaded extends Elimination {
-	constructor(tournament: TournamentSerialised) {
-		super(tournament.id);
+	constructor(tournament: Elimination) {
+		super(tournament.eventID);
 		Object.assign(this, tournament);
 		this.players = this.players.map(p => new Player(p));
 		this.matches = this.matches.map(m => new Match(m));

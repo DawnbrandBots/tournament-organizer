@@ -37,9 +37,11 @@ export class EventManager {
 
 	reloadTournament(tournament: Tournament.Tournament) {
 		let reloadedTournament;
-		if (tournament.format === "swiss") reloadedTournament = new Tournament.SwissReloaded(tournament);
-		else if (tournament.format === "robin") reloadedTournament = new Tournament.RoundRobinReloaded(tournament);
-		else reloadedTournament = new Tournament.EliminationReloaded(tournament);
+		if (tournament.format === "swiss")
+			reloadedTournament = new Tournament.SwissReloaded(tournament as Tournament.Swiss);
+		else if (tournament.format === "robin")
+			reloadedTournament = new Tournament.RoundRobinReloaded(tournament as Tournament.RoundRobin);
+		else reloadedTournament = new Tournament.EliminationReloaded(tournament as Tournament.Elimination);
 		return reloadedTournament;
 	}
 

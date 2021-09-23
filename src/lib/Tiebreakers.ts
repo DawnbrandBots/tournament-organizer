@@ -1,92 +1,95 @@
-"use strict";
+import { Player } from "../src/Player";
+import { Tournament } from "../src/Tournament";
 
 /**
- * Work for tiebreakers.
- * @namespace
+ * Computes all tiebreakers for a player.
+ * @param {Player} p The player being processed.
+ * @param {Tournament} t The current tournament.
  */
-const Tiebreakers = {
-	/**
-	 * Computes all tiebreakers for a player.
-	 * @param {Player} p The player being processed.
-	 * @param {Tournament} t The current tournament.
-	 */
-	compute: (p, t) => {
-		const calcCumulative = player => {
-			let score = 0;
-			let running = 0;
-			player.results.forEach(r => {
-				let inc = r.result === "w" ? t.winValue : r === "d" ? t.drawValue : t.lossValue;
-				score += inc;
-				running += score;
-			});
-			return running;
-		};
-		const calcMatchWin = (player, type) => {
-			let mwp = player.matchPoints / (t.winValue * player.matches);
-			if (isNaN(mwp)) mwp = 0;
-			if (type === "magic") return mwp < 0.33 ? 0.33 : mwp;
-			else return mwp < 0.25 ? 0.25 : mwp;
-		};
-		const calcGameWin = player => {
-			let gwp = player.gamePoints / (t.winValue * player.games);
-			if (isNaN(gwp)) gwp = 0;
-			return gwp < 0.33 ? 0.33 : gwp;
-		};
-		const oppScores = p.results.map(a => {
-			const o = t.players.find(x => x.id === a.opponent);
-			return o.matchPoints;
+export function compute(p: Player, t: Tournament) {
+	const calcCumulative = (player: Player) => {
+		let score = 0;
+		let running = 0;
+		player.results.forEach(r => {
+			let inc = r.result === "w" ? t.winValue : r.result === "d" ? t.drawValue : t.lossValue;
+			score += inc;
+			running += score;
 		});
-		p.tiebreakers.solkoff = oppScores.reduce((x, y) => x + y, 0);
-		oppScores.splice(oppScores.indexOf(Math.min(...oppScores)), 1);
-		p.tiebreakers.cutOne = oppScores.reduce((x, y) => x + y, 0);
-		oppScores.splice(oppScores.indexOf(Math.max(...oppScores)), 1);
-		p.tiebreakers.median = oppScores.reduce((x, y) => x + y, 0);
-		let neustadtlScore = 0;
-		p.results.forEach((r, i) => {
-			const op = t.players.find(x => x.id === r.opponent);
-			if (r.result === "w") neustadtlScore += op.matchPoints;
-			else if (r.result === "d") neustadtlScore += 0.5 * op.matchPoints;
-		});
-		p.tiebreakers.neustadtl = neustadtlScore;
-		p.tiebreakers.cumulative = calcCumulative(p);
-		p.tiebreakers.oppCumulative = p.results.reduce((x, y) => {
-			const op = t.players.find(z => z.id === y.opponent);
-			return x + calcCumulative(op);
-		}, 0);
-		p.tiebreakers.matchWinPctM = calcMatchWin(p, "magic");
-		p.tiebreakers.matchWinPctP = calcMatchWin(p, "pokemon");
-		p.tiebreakers.gameWinPct = calcGameWin(p);
-		p.tiebreakers.oppMatchWinPctM =
-			p.results.reduce((x, y) => {
-				const op = t.players.find(z => z.id === y.opponent);
-				return x + calcMatchWin(op, "magic");
-			}, 0) / p.results.length;
-		if (isNaN(p.tiebreakers.oppMatchWinPctM)) p.tiebreakers.oppMatchWinPctM = 0.33;
-		p.tiebreakers.oppMatchWinPctP =
-			p.results.reduce((x, y) => {
-				const op = t.players.find(z => z.id === y.opponent);
+		return running;
+	};
+	const calcMatchWin = (player: Player, type: string) => {
+		let mwp = player.matchPoints / (t.winValue * player.matches);
+		if (isNaN(mwp)) mwp = 0;
+		if (type === "magic") return mwp < 0.33 ? 0.33 : mwp;
+		else return mwp < 0.25 ? 0.25 : mwp;
+	};
+	const calcGameWin = (player: Player) => {
+		let gwp = player.gamePoints / (t.winValue * player.games);
+		if (isNaN(gwp)) gwp = 0;
+		return gwp < 0.33 ? 0.33 : gwp;
+	};
+	const oppScores = p.results.map(a => {
+		const o = t.players.find(x => x.id === a.opponent)!;
+		return o.matchPoints;
+	});
+	p.tiebreakers.solkoff = oppScores.reduce((x, y) => x + y, 0);
+	oppScores.splice(oppScores.indexOf(Math.min(...oppScores)), 1);
+	p.tiebreakers.cutOne = oppScores.reduce((x, y) => x + y, 0);
+	oppScores.splice(oppScores.indexOf(Math.max(...oppScores)), 1);
+	p.tiebreakers.median = oppScores.reduce((x, y) => x + y, 0);
+	let neustadtlScore = 0;
+	p.results.forEach((r, i) => {
+		const op = t.players.find(x => x.id === r.opponent)!;
+		if (r.result === "w") neustadtlScore += op.matchPoints;
+		else if (r.result === "d") neustadtlScore += 0.5 * op.matchPoints;
+	});
+	p.tiebreakers.neustadtl = neustadtlScore;
+	p.tiebreakers.cumulative = calcCumulative(p);
+	p.tiebreakers.oppCumulative = p.results.reduce((x, y) => {
+		const op = t.players.find(z => z.id === y.opponent)!;
+		return x + calcCumulative(op);
+	}, 0);
+	p.tiebreakers.matchWinPctM = calcMatchWin(p, "magic");
+	p.tiebreakers.matchWinPctP = calcMatchWin(p, "pokemon");
+	p.tiebreakers.gameWinPct = calcGameWin(p);
+	p.tiebreakers.oppMatchWinPctM =
+		p.results.reduce((x, y) => {
+			const op = t.players.find(z => z.id === y.opponent)!;
+			return x + calcMatchWin(op, "magic");
+		}, 0) / p.results.length;
+	if (isNaN(p.tiebreakers.oppMatchWinPctM)) p.tiebreakers.oppMatchWinPctM = 0.33;
+	p.tiebreakers.oppMatchWinPctP =
+		p.results.reduce((x, y) => {
+			const op = t.players.find(z => z.id === y.opponent)!;
+			return x + calcMatchWin(op, "pokemon");
+		}, 0) / p.results.length;
+	if (isNaN(p.tiebreakers.oppMatchWinPctP)) p.tiebreakers.oppMatchWinPctP = 0.25;
+	p.tiebreakers.oppGameWinPct =
+		p.results.reduce((x, y) => {
+			const op = t.players.find(z => z.id === y.opponent)!;
+			return x + calcGameWin(op);
+		}, 0) / p.results.length;
+	if (isNaN(p.tiebreakers.oppGameWinPct)) p.tiebreakers.oppGameWinPct = 0.33;
+	if (p.results.length === 0) p.tiebreakers.oppOppMatchWinPct = 0.25;
+	else {
+		let oppOppMatchSum = 0;
+		p.results.forEach(r => {
+			const o = t.players.find(x => x.id === r.opponent)!;
+			oppOppMatchSum += o.results.reduce((x, y) => {
+				const op = t.players.find(z => z.id === y.opponent)!;
 				return x + calcMatchWin(op, "pokemon");
-			}, 0) / p.results.length;
-		if (isNaN(p.tiebreakers.oppMatchWinPctP)) p.tiebreakers.oppMatchWinPctP = 0.25;
-		p.tiebreakers.oppGameWinPct =
-			p.results.reduce((x, y) => {
-				const op = t.players.find(z => z.id === y.opponent);
-				return x + calcGameWin(op);
-			}, 0) / p.results.length;
-		if (isNaN(p.tiebreakers.oppGameWinPct)) p.tiebreakers.oppGameWinPct = 0.33;
-		if (p.results.length === 0) p.tiebreakers.oppOppMatchWinPct = 0.25;
-		else {
-			let oppOppMatchSum = 0;
-			p.results.forEach(r => {
-				const o = t.players.find(x => x.id === r.opponent);
-				oppOppMatchSum += o.results.reduce((x, y) => {
-					const op = t.players.find(z => z.id === y.opponent);
-					return x + calcMatchWin(op, "pokemon");
-				}, 0);
-			});
-			p.tiebreakers.oppOppMatchWinPct = oppOppMatchSum / p.results.length;
-		}
-	},
+			}, 0);
+		});
+		p.tiebreakers.oppOppMatchWinPct = oppOppMatchSum / p.results.length;
+	}
+}
+
+interface Tiebreaker {
+	equal: (a: Player, b: Player) => boolean | number;
+	diff: (a: Player, b: Player, n?: number) => number;
+}
+
+const Tiebreakers: { [type: string]: Tiebreaker } = {
 	/**
 	 * Contains equality and difference functions for match points.
 	 * @type {Object}
@@ -192,4 +195,4 @@ const Tiebreakers = {
 	}
 };
 
-module.exports = Tiebreakers;
+export default Tiebreakers;
