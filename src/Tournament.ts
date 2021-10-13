@@ -1037,3 +1037,14 @@ export class Elimination extends Tournament {
 		return newMatches;
 	}
 }
+
+export function createTournament(options: Options = {}): Tournament {
+	switch (options.format) {
+		case "swiss":
+			return new Swiss("", options);
+		case "robin":
+			return new RoundRobin("", options);
+		default:
+			return new Elimination("", options);
+	}
+}
