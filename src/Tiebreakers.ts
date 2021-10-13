@@ -1,5 +1,5 @@
-import { Player } from "../src/Player";
-import { Tournament } from "../src/Tournament";
+import { Player } from "./Player";
+import { Tournament } from "./Tournament";
 
 /**
  * Computes all tiebreakers for a player.

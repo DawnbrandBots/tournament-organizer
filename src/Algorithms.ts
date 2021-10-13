@@ -1,6 +1,6 @@
-import { Match } from "../src/Match";
+import { Match } from "./Match";
 import * as Utilities from "./Utilities";
-import { Player } from "../src/Player";
+import { Player } from "./Player";
 
 /**
  * Determines seeding for elimination brackets.

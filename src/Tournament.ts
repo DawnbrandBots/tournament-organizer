@@ -1,8 +1,8 @@
 import { Match } from "./Match";
 import { Player } from "./Player";
-import * as Utilities from "../lib/Utilities";
-import * as Algorithms from "../lib/Algorithms";
-import * as Tiebreakers from "../lib/Tiebreakers";
+import * as Utilities from "./Utilities";
+import * as Algorithms from "./Algorithms";
+import * as Tiebreakers from "./Tiebreakers";
 
 export interface Options {
 	name?: string;

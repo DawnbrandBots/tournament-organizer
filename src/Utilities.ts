@@ -3,7 +3,7 @@
  * @namespace
  */
 
-import { Player } from "../src/Player";
+import { Player } from "./Player";
 
 /**
  * Creates a random alphanumeric string.

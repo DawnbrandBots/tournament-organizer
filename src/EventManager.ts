@@ -1,5 +1,5 @@
 import * as Tournament from "./Tournament";
-import * as Utilities from "../lib/Utilities";
+import * as Utilities from "./Utilities";
 
 /** Class representing an event manager. */
 export class EventManager {
