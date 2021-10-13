@@ -409,6 +409,26 @@ export abstract class Tournament {
 		draws?: number,
 		dropdown?: boolean
 	): Match[] | null;
+
+	reload<T extends typeof this = typeof this>(): T {
+		const tournament: T = this.constructor(this.eventID);
+
+		Object.assign(tournament, this);
+		tournament.players = this.players.map(p => new Player(p));
+		tournament.matches = this.matches.map(m => new Match(m));
+		tournament.matches.forEach(m => {
+			if (m.playerOne !== undefined) {
+				const p1 = tournament.players.find(p => m.playerOne!.id === p.id);
+				if (p1 !== undefined) m.playerOne = p1;
+			}
+			if (m.playerTwo !== undefined) {
+				const p2 = tournament.players.find(p => m.playerTwo!.id === p.id);
+				if (p2 !== undefined) m.playerTwo = p2;
+			}
+		});
+
+		return tournament;
+	}
 }
 
 /**
@@ -602,32 +622,6 @@ export class Swiss extends Tournament {
 			newMatches = this.activeMatches();
 		}
 		return newMatches;
-	}
-}
-
-/**
- * Class recreating a Swiss pairing tournament from an existing object.
- * @extends Swiss
- */
-export class SwissReloaded extends Swiss {
-	constructor(tournament: Swiss) {
-		super(tournament.eventID);
-		tournament.players ||= [];
-		tournament.matches ||= [];
-
-		Object.assign(this, tournament);
-		this.players = this.players.map(p => new Player(p));
-		this.matches = this.matches.map(m => new Match(m));
-		this.matches.forEach(m => {
-			if (m.playerOne !== undefined) {
-				const p1 = this.players.find(p => m.playerOne!.id === p.id);
-				if (p1 !== undefined) m.playerOne = p1;
-			}
-			if (m.playerTwo !== undefined) {
-				const p2 = this.players.find(p => m.playerTwo!.id === p.id);
-				if (p2 !== undefined) m.playerTwo = p2;
-			}
-		});
 	}
 }
 
@@ -946,32 +940,6 @@ export class RoundRobin extends Tournament {
 	}
 }
 
-/**
- * Class recreating a round-robin pairing tournament from an existing object.
- * @extends RoundRobin
- */
-export class RoundRobinReloaded extends RoundRobin {
-	constructor(tournament: RoundRobin) {
-		super(tournament.eventID);
-		tournament.matches ||= [];
-		tournament.players ||= [];
-		tournament.groups ||= [];
-
-		Object.assign(this, tournament);
-		this.players = this.players.map(p => new Player(p));
-		this.matches = this.matches.map(m => new Match(m));
-		this.matches.forEach(m => {
-			if (m.playerOne !== undefined) {
-				const p1 = this.players.find(p => m.playerOne!.id === p.id);
-				if (p1 !== undefined) m.playerOne = p1;
-			}
-			if (m.playerTwo !== undefined) {
-				const p2 = this.players.find(p => m.playerTwo!.id === p.id);
-				if (p2 !== undefined) m.playerTwo = p2;
-			}
-		});
-	}
-}
 
 /**
  * Class representing an elimination tournament.
@@ -1067,28 +1035,5 @@ export class Elimination extends Tournament {
 		}
 		if (this.activeMatches().length === 0) this.active = false;
 		return newMatches;
-	}
-}
-
-/**
- * Class recreating an elimination tournament from an existing object.
- * @extends Elimination
- */
-export class EliminationReloaded extends Elimination {
-	constructor(tournament: Elimination) {
-		super(tournament.eventID);
-		Object.assign(this, tournament);
-		this.players = this.players.map(p => new Player(p));
-		this.matches = this.matches.map(m => new Match(m));
-		this.matches.forEach(m => {
-			if (m.playerOne !== undefined) {
-				const p1 = this.players.find(p => m.playerOne!.id === p.id);
-				if (p1 !== undefined) m.playerOne = p1;
-			}
-			if (m.playerTwo !== undefined) {
-				const p2 = this.players.find(p => m.playerTwo!.id === p.id);
-				if (p2 !== undefined) m.playerTwo = p2;
-			}
-		});
 	}
 }
